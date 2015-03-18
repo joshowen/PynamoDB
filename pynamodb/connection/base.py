@@ -216,6 +216,7 @@ class Connection(object):
         if not response.ok:
             if "ProvisionedThroughputExceededException" in response.content:
                 if backoff:
+                    log.warning("At capacity, expnentially backing off")
                     timeout = kwargs.get("timeout", 1)
                     timeout = timeout * 2
 
