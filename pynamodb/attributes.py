@@ -1,14 +1,20 @@
 """
 PynamoDB attributes
 """
-import six
-import json
 from base64 import b64encode, b64decode
 from delorean import Delorean, parse
 from pynamodb.constants import (
     STRING, NUMBER, BINARY, UTC, DATETIME_FORMAT, BINARY_SET, STRING_SET, NUMBER_SET,
     DEFAULT_ENCODING
 )
+import six
+
+
+try:
+    import ujson as json
+    HAS_UJSON = True
+except ImportError:
+    import json
 
 
 class Attribute(object):
@@ -177,7 +183,10 @@ class JSONAttribute(Attribute):
         """
         Deserializes JSON
         """
-        return json.loads(value, strict=False)
+        if HAS_UJSON:
+            return json.loads(value)
+        else:
+            return json.loads(value, strict=False)
 
 
 class BooleanAttribute(Attribute):
@@ -224,6 +233,9 @@ class NumberAttribute(Attribute):
         """
         Encode numbers as JSON
         """
+        if isinstance(value, float):
+            from decimal import Decimal
+            value = Decimal(value)
         return json.dumps(value)
 
     def deserialize(self, value):
