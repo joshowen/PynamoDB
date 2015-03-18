@@ -25,7 +25,7 @@ class IndexMeta(type):
                     meta_cls = attrs.get(META_CLASS_NAME)
                     if meta_cls is not None:
                         meta_cls.attributes = None
-                elif issubclass(attr_obj.__class__, (Attribute, )):
+                elif issubclass(attr_obj.__class__, (Attribute,)):
                     if attr_obj.attr_name is None:
                         attr_obj.attr_name = attr_name
 
@@ -64,7 +64,8 @@ class Index(with_metaclass(IndexMeta)):
               consistent_read=False,
               limit=None,
               last_evaluated_key=None,
-              **filters):
+              attributes_to_get=None,
+              ** filters):
         """
         Queries an index
         """
@@ -75,6 +76,7 @@ class Index(with_metaclass(IndexMeta)):
             consistent_read=consistent_read,
             limit=limit,
             last_evaluated_key=last_evaluated_key,
+            attributes_to_get=attributes_to_get,
             **filters
         )
 
@@ -123,7 +125,7 @@ class Index(with_metaclass(IndexMeta)):
             cls.Meta.attributes = {}
             for item in dir(cls):
                 item_cls = getattr(getattr(cls, item), "__class__", None)
-                if item_cls and issubclass(item_cls, (Attribute, )):
+                if item_cls and issubclass(item_cls, (Attribute,)):
                     cls.Meta.attributes[item] = getattr(cls, item)
         return cls.Meta.attributes
 

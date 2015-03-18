@@ -2,7 +2,10 @@
 pynamodb attributes tests
 """
 import six
-import json
+try:
+    import ujson as json
+except:
+    import json
 from base64 import b64encode
 from datetime import datetime
 from delorean import Delorean

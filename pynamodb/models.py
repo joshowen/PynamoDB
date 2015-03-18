@@ -168,11 +168,11 @@ class MetaModel(type):
                         setattr(attr_obj, REGION, DEFAULT_REGION)
                     if not hasattr(attr_obj, HOST):
                         setattr(attr_obj, HOST, None)
-                elif issubclass(attr_obj.__class__, (Index, )):
+                elif issubclass(attr_obj.__class__, (Index,)):
                     attr_obj.Meta.model = cls
                     if not hasattr(attr_obj.Meta, "index_name"):
                         attr_obj.Meta.index_name = attr_name
-                elif issubclass(attr_obj.__class__, (Attribute, )):
+                elif issubclass(attr_obj.__class__, (Attribute,)):
                     if attr_obj.attr_name is None:
                         attr_obj.attr_name = attr_name
 
@@ -250,7 +250,7 @@ class Model(with_metaclass(MetaModel)):
         self._set_attributes(**attrs)
 
     @classmethod
-    def batch_get(cls, items):
+    def batch_get(cls, items, consistent_read=None, attributes_to_get=None):
         """
         BatchGetItem for this model
 
@@ -264,7 +264,7 @@ class Model(with_metaclass(MetaModel)):
         while items:
             if len(keys_to_get) == BATCH_GET_PAGE_LIMIT:
                 while keys_to_get:
-                    page, unprocessed_keys = cls._batch_get_page(keys_to_get)
+                    page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read, attributes_to_get)
                     for batch_item in page:
                         yield cls.from_raw_data(batch_item)
                     if unprocessed_keys:
@@ -285,7 +285,7 @@ class Model(with_metaclass(MetaModel)):
                 })
 
         while keys_to_get:
-            page, unprocessed_keys = cls._batch_get_page(keys_to_get)
+            page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read, attributes_to_get)
             for batch_item in page:
                 yield cls.from_raw_data(batch_item)
             if unprocessed_keys:
@@ -501,7 +501,8 @@ class Model(with_metaclass(MetaModel)):
               scan_index_forward=None,
               limit=None,
               last_evaluated_key=None,
-              **filters):
+              attributes_to_get=None,
+              ** filters):
         """
         Provides a high level query API
 
@@ -512,6 +513,7 @@ class Model(with_metaclass(MetaModel)):
         :param scan_index_forward: If set, then used to specify the same parameter to the DynamoDB API.
             Controls descending or ascending results
         :param last_evaluated_key: If set, provides the starting point for query.
+        :param attributes_to_get: If set, only returns these elements
         :param filters: A dictionary of filters to be used in the query
         """
         cls._get_indexes()
@@ -544,6 +546,7 @@ class Model(with_metaclass(MetaModel)):
             scan_index_forward=scan_index_forward,
             limit=limit,
             key_conditions=key_conditions,
+            attributes_to_get=attributes_to_get,
             query_filters=query_filters
         )
         cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
@@ -932,7 +935,7 @@ class Model(with_metaclass(MetaModel)):
                 item_cls = getattr(getattr(cls, item), "__class__", None)
                 if item_cls is None:
                     continue
-                if issubclass(item_cls, (Index, )):
+                if issubclass(item_cls, (Index,)):
                     item_cls = getattr(cls, item)
                     cls._index_classes[item_cls.Meta.index_name] = item_cls
                     schema = item_cls._get_schema()
@@ -969,7 +972,7 @@ class Model(with_metaclass(MetaModel)):
                 item_cls = getattr(getattr(cls, item), "__class__", None)
                 if item_cls is None:
                     continue
-                if issubclass(item_cls, (Attribute, )):
+                if issubclass(item_cls, (Attribute,)):
                     instance = getattr(cls, item)
                     cls._attributes[item] = instance
         return cls._attributes
@@ -1000,7 +1003,7 @@ class Model(with_metaclass(MetaModel)):
         serialized = self._serialize(null_check=null_check)
         hash_key = serialized.get(HASH)
         range_key = serialized.get(RANGE, None)
-        args = (hash_key, )
+        args = (hash_key,)
         if range_key:
             kwargs[pythonic(RANGE_KEY)] = range_key
         if attributes:
@@ -1045,7 +1048,7 @@ class Model(with_metaclass(MetaModel)):
         return attrs
 
     @classmethod
-    def _batch_get_page(cls, keys_to_get):
+    def _batch_get_page(cls, keys_to_get, consistent_read, attributes_to_get):
         """
         Returns a single page from BatchGetItem
         Also returns any unprocessed items
@@ -1054,7 +1057,9 @@ class Model(with_metaclass(MetaModel)):
         """
         log.debug("Fetching a BatchGetItem page")
         data = cls._get_connection().batch_get_item(
-            keys_to_get
+            keys_to_get,
+            consistent_read=consistent_read,
+            attributes_to_get=attributes_to_get,
         )
         cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
         item_data = data.get(RESPONSES).get(cls.Meta.table_name)

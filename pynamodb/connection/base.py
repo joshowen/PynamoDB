@@ -212,11 +212,10 @@ class Connection(object):
                 operation_kwargs.update(self.get_consumed_capacity_map(TOTAL))
         self._log_debug(operation_name, operation_kwargs)
         response, data = self.service.get_operation(operation_name).call(self.endpoint, **operation_kwargs)
-        operation = self.service.get_operation(operation_name)
         if not response.ok:
             if "ProvisionedThroughputExceededException" in response.content:
                 if backoff:
-                    log.warning("At capacity, expnentially backing off")
+                    log.warning("At capacity, exponentially backing off")
                     timeout = kwargs.get("timeout", 1)
                     timeout = timeout * 2
 
@@ -339,7 +338,7 @@ class Connection(object):
             for index in local_secondary_indexes:
                 local_secondary_indexes_list.append({
                     INDEX_NAME: index.get(pythonic(INDEX_NAME)),
-                    KEY_SCHEMA: sorted(index.get(pythonic(KEY_SCHEMA)), key=lambda x: x.get(KEY_TYPE)), 
+                    KEY_SCHEMA: sorted(index.get(pythonic(KEY_SCHEMA)), key=lambda x: x.get(KEY_TYPE)),
                     PROJECTION: index.get(pythonic(PROJECTION)),
                 })
             operation_kwargs[pythonic(LOCAL_SECONDARY_INDEXES)] = local_secondary_indexes_list
@@ -741,11 +740,11 @@ class Connection(object):
 
         args_map = {}
         if consistent_read:
-            args_map[pythonic(CONSISTENT_READ)] = consistent_read
+            args_map[CONSISTENT_READ] = consistent_read
         if return_consumed_capacity:
             operation_kwargs.update(self.get_consumed_capacity_map(return_consumed_capacity))
         if attributes_to_get is not None:
-            args_map[pythonic(ATTRS_TO_GET)] = attributes_to_get
+            args_map[ATTRS_TO_GET] = attributes_to_get
         operation_kwargs[pythonic(REQUEST_ITEMS)][table_name].update(args_map)
 
         keys_map = {KEYS: []}
