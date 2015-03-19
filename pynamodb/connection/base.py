@@ -2,17 +2,7 @@
 Lowest level connection
 """
 import logging
-
-import six
-import time
-from botocore.session import get_session
-
-from .util import pythonic
-from ..types import HASH, RANGE
 from pynamodb.compat import NullHandler
-from pynamodb.exceptions import (
-    TableError, QueryError, PutError, DeleteError, UpdateError, GetError, ScanError, TableDoesNotExist
-)
 from pynamodb.constants import (
     RETURN_CONSUMED_CAPACITY_VALUES, RETURN_ITEM_COLL_METRICS_VALUES, COMPARISON_OPERATOR_VALUES,
     RETURN_ITEM_COLL_METRICS, RETURN_CONSUMED_CAPACITY, RETURN_VALUES_VALUES, ATTR_UPDATE_ACTIONS,
@@ -28,6 +18,17 @@ from pynamodb.constants import (
     CONSUMED_CAPACITY, CAPACITY_UNITS, QUERY_FILTER, QUERY_FILTER_VALUES, CONDITIONAL_OPERATOR,
     CONDITIONAL_OPERATORS, NULL, NOT_NULL, SHORT_ATTR_TYPES
 )
+from pynamodb.exceptions import (
+    TableError, QueryError, PutError, DeleteError, UpdateError, GetError, ScanError, TableDoesNotExist
+)
+import time
+
+import botocore
+from botocore.session import get_session
+import six
+
+from ..types import HASH, RANGE
+from .util import pythonic
 
 
 log = logging.getLogger(__name__)
@@ -168,6 +169,7 @@ class Connection(object):
         self._tables = {}
         self.host = host
         self._session = None
+        self._endpoint = None
         if region:
             self.region = region
         else:
@@ -254,11 +256,14 @@ class Connection(object):
         """
         Returns an endpoint connection to `self.region`
         """
-        if self.host:
-            end_point = self.service.get_endpoint(self.region, endpoint_url=self.host)
-        else:
-            end_point = self.service.get_endpoint(self.region)
-        return end_point
+        if self._endpoint is None:
+            if self.host:
+                self._endpoint = self.service.get_endpoint(self.region, endpoint_url=self.host)
+            else:
+                self._endpoint = self.service.get_endpoint(self.region)
+            self._endpoint.http_session.mount('https://', botocore.vendored.requests.adapters.HTTPAdapter(pool_maxsize=250))
+            self._endpoint.http_session.mount('http://', botocore.vendored.requests.adapters.HTTPAdapter(pool_maxsize=250))
+        return self._endpoint
 
     def get_meta_table(self, table_name, refresh=False):
         """
