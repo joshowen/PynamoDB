@@ -4,8 +4,10 @@ pynamodb attributes tests
 import six
 try:
     import ujson as json
+    HAS_UJSON = True
 except:
     import json
+    HAS_UJSON = False
 from base64 import b64encode
 from datetime import datetime
 from delorean import Delorean

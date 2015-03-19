@@ -15,6 +15,7 @@ try:
     HAS_UJSON = True
 except ImportError:
     import json
+    HAS_UJSON = False
 
 
 class Attribute(object):
