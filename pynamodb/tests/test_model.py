@@ -7,7 +7,6 @@ import six
 import copy
 from datetime import datetime
 from pynamodb.compat import CompatTestCase as TestCase
-from pynamodb.compat import OrderedDict
 from pynamodb.throttle import Throttle
 from pynamodb.connection.util import pythonic
 from pynamodb.exceptions import TableError, ScanError
@@ -1102,7 +1101,7 @@ class ModelTestCase(TestCase):
                     item_idx += 1
                     if query_item == start_key:
                         break
-                query_items = BATCH_GET_ITEMS.get(RESPONSES).get(UserModel.Meta.table_name)[item_idx:item_idx+1]
+                query_items = BATCH_GET_ITEMS.get(RESPONSES).get(UserModel.Meta.table_name)[item_idx:item_idx + 1]
             else:
                 query_items = BATCH_GET_ITEMS.get(RESPONSES).get(UserModel.Meta.table_name)[:1]
             data = {
@@ -1230,7 +1229,7 @@ class ModelTestCase(TestCase):
                     item_idx += 1
                     if scan_item == start_key:
                         break
-                scan_items = BATCH_GET_ITEMS.get(RESPONSES).get(UserModel.Meta.table_name)[item_idx:item_idx+1]
+                scan_items = BATCH_GET_ITEMS.get(RESPONSES).get(UserModel.Meta.table_name)[item_idx:item_idx + 1]
             else:
                 scan_items = BATCH_GET_ITEMS.get(RESPONSES).get(UserModel.Meta.table_name)[:1]
             data = {
@@ -1885,7 +1884,7 @@ class ModelTestCase(TestCase):
 
         with patch(PATCH_METHOD, new=fake_db) as req:
             LocalIndexedModel.create_table(read_capacity_units=2, write_capacity_units=2)
-            params = OrderedDict({
+            params = {
                 'attribute_definitions': [
                     {
                         'attribute_name': 'email', 'attribute_type': 'S'
@@ -1903,7 +1902,7 @@ class ModelTestCase(TestCase):
                         'AttributeName': 'numbers', 'KeyType': 'RANGE'
                     }
                 ]
-            })
+            }
             schema = LocalIndexedModel.email_index._get_schema()
             args = req.call_args[1]
             self.assert_dict_lists_equal(schema['attribute_definitions'], params['attribute_definitions'])

@@ -180,26 +180,22 @@ class Connection(object):
         """
         Sends a debug message to the logger
         """
-        log.debug("Calling {0} with arguments {1}".format(
-            operation,
-            kwargs
-        ))
+        log.debug("Calling %s with arguments %s", operation, kwargs)
 
     def _log_debug_response(self, operation, response):
         """
         Sends a debug message to the logger about a response
         """
-        log.debug("{0} response: {1}".format(operation, response))
+        log.debug("%s response: %s", operation, response)
 
     def _log_error(self, operation, response):
         """
         Sends an error message to the logger
         """
-        log.error("{0} failed with status: {1}, message: {2}".format(
-            operation,
-            response.status_code,
-            response.content)
-        )
+        log.error("%s failed with status: %s, message: %s",
+                  operation,
+                  response.status_code,
+                  response.content)
 
     def dispatch(self, operation_name, operation_kwargs, backoff=True, **kwargs):
         """
@@ -215,9 +211,9 @@ class Connection(object):
         if not response.ok:
             if "ProvisionedThroughputExceededException" in response.content:
                 if backoff:
-                    log.warning("At capacity, exponentially backing off")
                     timeout = kwargs.get("timeout", 1)
                     timeout = timeout * 2
+                    log.warning("At capacity, exponentially backing off for %s seconds", timeout)
 
                     # arbitrary timeout limit such that if backing off doesn't help, at some point
                     # let the exception propagate and it becomes a real error
@@ -230,13 +226,10 @@ class Connection(object):
             capacity = data.get(CONSUMED_CAPACITY)
             if isinstance(capacity, dict) and CAPACITY_UNITS in capacity:
                 capacity = capacity.get(CAPACITY_UNITS)
-            log.debug(
-                "{0} {1} consumed {2} units".format(
-                    data.get(TABLE_NAME, ''),
-                    operation_name,
-                    capacity
-                )
-            )
+            log.debug("%s %s consumed %s units",
+                      data.get(TABLE_NAME, ''),
+                      operation_name,
+                      capacity)
         self._log_debug_response(operation_kwargs, response)
         return response, data
 
