@@ -234,7 +234,7 @@ class NumberAttribute(Attribute):
         """
         Encode numbers as JSON
         """
-        if isinstance(value, float):
+        if HAS_UJSON and isinstance(value, float):
             from decimal import Decimal
             value = Decimal(value)
         return json.dumps(value)
