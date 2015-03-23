@@ -215,11 +215,11 @@ class Connection(object):
                 if backoff:
                     timeout = kwargs.get("timeout", 1)
                     timeout = timeout * 2
-                    log.warning("At capacity, exponentially backing off for %s seconds", timeout)
+                    log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
 
                     # arbitrary timeout limit such that if backing off doesn't help, at some point
                     # let the exception propagate and it becomes a real error
-                    if timeout < 100:
+                    if timeout <= 128:
                         time.sleep(timeout)
                         return self.dispatch(operation_name, operation_kwargs, backoff=backoff, timeout=timeout)
             self._log_error(operation_name, response)

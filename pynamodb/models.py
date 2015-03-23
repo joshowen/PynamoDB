@@ -240,7 +240,6 @@ class Model(with_metaclass(MetaModel)):
         :param attrs: A dictionary of attributes to set on this object.
         """
         self.attribute_values = {}
-        self._set_defaults()
         if hash_key:
             attrs[self._get_meta_data().hash_keyname] = hash_key
         if range_key:
@@ -251,6 +250,7 @@ class Model(with_metaclass(MetaModel)):
                 )
             attrs[range_keyname] = range_key
         self._set_attributes(**attrs)
+        self._set_defaults()
 
     @classmethod
     def batch_get(cls, items, consistent_read=None, attributes_to_get=None):
@@ -1075,12 +1075,13 @@ class Model(with_metaclass(MetaModel)):
         """
         for name, attr in self._get_attributes().aliased_attrs():
             default = attr.default
-            if callable(default):
-                value = default()
-            else:
-                value = default
-            if value is not None:
-                setattr(self, name, value)
+            if getattr(self, name) is None and default is not None:
+                if callable(default):
+                    value = default()
+                else:
+                    value = default
+                if value is not None:
+                    setattr(self, name, value)
 
     def _set_attributes(self, **attrs):
         """
