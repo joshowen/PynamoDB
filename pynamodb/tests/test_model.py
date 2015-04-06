@@ -627,6 +627,16 @@ class ModelTestCase(TestCase):
                     }
                 }
             }
+            self.assertRaises(ValueError, item.update_item, 'views', 10)
+
+        with patch(PATCH_METHOD) as req:
+            req.return_value = HttpOK({}), {
+                ATTRIBUTES: {
+                    "views": {
+                        "N": "10"
+                    }
+                }
+            }
             item.update_item('views', 10, action='add')
             args = req.call_args[1]
             params = {
@@ -1201,6 +1211,73 @@ class ModelTestCase(TestCase):
                 count += 1
                 self.assertIsNotNone(item)
             self.assertEqual(count, 4)
+
+        with patch(PATCH_METHOD) as req:
+            items = []
+            for idx in range(10):
+                item = copy.copy(GET_MODEL_ITEM_DATA.get(ITEM))
+                item['user_id'] = {STRING_SHORT: 'id-{0}'.format(idx)}
+                items.append(item)
+            req.return_value = HttpOK({'Items': items}), {'Items': items}
+            queried = []
+            for item in UserModel.query(
+                    'foo',
+                    user_id__begins_with='id',
+                    email__contains='@',
+                    picture__null=False,
+                    zip_code__ge=2,
+                    conditional_operator='AND'):
+                queried.append(item._serialize())
+            params = {
+                'key_conditions': {
+                    'user_id': {
+                        'AttributeValueList': [
+                            {'S': 'id'}
+                        ],
+                        'ComparisonOperator': 'BEGINS_WITH'
+                    },
+                    'user_name': {
+                        'AttributeValueList': [
+                            {'S': 'foo'}
+                        ],
+                        'ComparisonOperator': 'EQ'
+                    }
+                },
+                'query_filter': {
+                    'email': {
+                        'AttributeValueList': [
+                            {'S': '@'}
+                        ],
+                        'ComparisonOperator': 'CONTAINS'
+                    },
+                    'zip_code': {
+                        'ComparisonOperator': 'GE',
+                        'AttributeValueList': [
+                            {'N': '2'},
+                        ]
+                    },
+                    'picture': {
+                        'ComparisonOperator': 'NOT_NULL'
+                    }
+                },
+                'conditional_operator': 'AND',
+                'return_consumed_capacity': 'TOTAL',
+                'table_name': 'UserModel'
+            }
+
+            for key in ('conditional_operator', 'return_consumed_capacity', 'table_name'):
+                self.assertEqual(req.call_args[1][key], params[key])
+            for key in ('user_id', 'user_name'):
+                self.assertEqual(
+                    req.call_args[1]['key_conditions'][key],
+                    params['key_conditions'][key]
+                )
+            for key in ('email', 'zip_code', 'picture'):
+                self.assertEqual(
+                    sorted(req.call_args[1]['query_filter'][key].items(), key=lambda x: x[0]),
+                    sorted(params['query_filter'][key].items(), key=lambda x: x[0]),
+                )
+            self.assertTrue(len(queried) == len(items))
 
     def test_scan(self):
         """

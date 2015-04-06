@@ -240,9 +240,9 @@ class Model(with_metaclass(MetaModel)):
         :param attrs: A dictionary of attributes to set on this object.
         """
         self.attribute_values = {}
-        if hash_key:
+        if hash_key is not None:
             attrs[self._get_meta_data().hash_keyname] = hash_key
-        if range_key:
+        if range_key is not None:
             range_keyname = self._get_meta_data().range_keyname
             if range_keyname is None:
                 raise ValueError(
@@ -335,19 +335,19 @@ class Model(with_metaclass(MetaModel)):
         :param action: The action to take if this item already exists.
             See: http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html#DDB-UpdateItem-request-AttributeUpdate
         """
-        args, kwargs = self._get_save_args(null_check=False)
-        if len(expected_values):
-            kwargs.update(expected=self._build_expected_values(expected_values, UPDATE_FILTER_OPERATOR_MAP))
+        args, _ = self._get_save_args(null_check=False)
         attribute_cls = None
         for attr_name, attr_cls in self._get_attributes().items():
             if attr_name == attribute:
                 value = attr_cls.serialize(value)
                 attribute_cls = attr_cls
                 break
-        del(kwargs[pythonic(ATTRIBUTES)])
+        kwargs = {}
+        if len(expected_values):
+            kwargs.update(expected=self._build_expected_values(expected_values, UPDATE_FILTER_OPERATOR_MAP))
         kwargs[pythonic(ATTR_UPDATES)] = {
             attribute: {
-                ACTION: action.upper(),
+                ACTION: action.upper() if action else None,
                 VALUE: {
                     ATTR_TYPE_MAP[attribute_cls.attr_type]: value
                 }
@@ -502,6 +502,7 @@ class Model(with_metaclass(MetaModel)):
               consistent_read=False,
               index_name=None,
               scan_index_forward=None,
+              conditional_operator=None,
               limit=None,
               last_evaluated_key=None,
               attributes_to_get=None,
@@ -541,17 +542,19 @@ class Model(with_metaclass(MetaModel)):
             filters=filters)
         log.debug("Fetching first query page")
 
-        data = cls._get_connection().query(
-            hash_key,
-            exclusive_start_key=last_evaluated_key,
+        query_kwargs = dict(
             index_name=index_name,
+            exclusive_start_key=last_evaluated_key,
             consistent_read=consistent_read,
             scan_index_forward=scan_index_forward,
             limit=limit,
             key_conditions=key_conditions,
             attributes_to_get=attributes_to_get,
-            query_filters=query_filters
+            query_filters=query_filters,
+            conditional_operator=conditional_operator
         )
+
+        data = cls._get_connection().query(hash_key, **query_kwargs)
         cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
 
         last_evaluated_key = data.get(LAST_EVALUATED_KEY, None)
@@ -569,17 +572,10 @@ class Model(with_metaclass(MetaModel)):
                 limit -= data.get("Count", 0)
                 if limit == 0:
                     return
+            query_kwargs['exclusive_start_key'] = last_evaluated_key
+            query_kwargs['limit'] = limit
             log.debug("Fetching query page with exclusive start key: %s", last_evaluated_key)
-            data = cls._get_connection().query(
-                hash_key,
-                exclusive_start_key=last_evaluated_key,
-                index_name=index_name,
-                consistent_read=consistent_read,
-                scan_index_forward=scan_index_forward,
-                limit=limit,
-                key_conditions=key_conditions,
-                query_filters=query_filters
-            )
+            data = cls._get_connection().query(hash_key, **query_kwargs)
             cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
             for item in data.get(ITEMS):
                 if limit is not None:
@@ -1149,7 +1145,7 @@ class Model(with_metaclass(MetaModel)):
             if attr_instance:
                 attr_type = ATTR_TYPE_MAP[attr_instance.attr_type]
                 value = attr.get(attr_type, None)
-                if value:
+                if value is not None:
                     setattr(self, name, attr_instance.deserialize(value))
 
     def _serialize(self, attr_map=False, null_check=True):
