@@ -1073,7 +1073,10 @@ class Model(with_metaclass(MetaModel)):
             default = attr.default
             if getattr(self, name) is None and default is not None:
                 if callable(default):
-                    value = default()
+                    try:
+                        value = default(self)
+                    except TypeError:
+                        value = default()
                 else:
                     value = default
                 if value is not None:
