@@ -47,6 +47,20 @@ class PutError(PynamoDBConnectionError):
     msg = "Error putting item"
 
 
+class BatchGetException(PynamoDBConnectionError):
+    """
+    Raised when a batch get fails
+    """
+    msg = "Error batch getting items"
+
+
+class BatchWriteException(PynamoDBConnectionError):
+    """
+    Raised when a batch write fails
+    """
+    msg = "Error batch writing items"
+
+
 class UpdateError(PynamoDBConnectionError):
     """
     Raised when an item fails to be updated

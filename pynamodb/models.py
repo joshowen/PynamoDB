@@ -11,7 +11,7 @@ import copy
 import logging
 import collections
 from six import with_metaclass
-from .exceptions import DoesNotExist, TableDoesNotExist
+from .exceptions import DoesNotExist, TableDoesNotExist, BatchWriteException, BatchGetException
 from .throttle import NoThrottle
 from .attributes import Attribute
 from .connection.base import MetaTable
@@ -121,7 +121,14 @@ class BatchWrite(ModelContextManager):
         if data is None:
             return
         unprocessed_items = data.get(UNPROCESSED_ITEMS, {}).get(self.model.Meta.table_name)
+        timeout = 1
         while unprocessed_items:
+            timeout = timeout * 2
+            log.warning("BATCH WRITE PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+            if timeout <= 128:
+                time.sleep(timeout)
+            else:
+                raise BatchWriteException("Hit max throttle")
             put_items = []
             delete_items = []
             for item in unprocessed_items:
@@ -287,12 +294,19 @@ class Model(with_metaclass(MetaModel)):
                     hash_keyname: hash_key
                 })
 
+        timeout = 1
         while keys_to_get:
             page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read, attributes_to_get)
             for batch_item in page:
                 yield cls.from_raw_data(batch_item)
             if unprocessed_keys:
                 keys_to_get = unprocessed_keys
+                timeout = timeout * 2
+                log.warning("BATCH READ PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                if timeout <= 128:
+                    time.sleep(timeout)
+                else:
+                    raise BatchGetException("Hit max throttle")
             else:
                 keys_to_get = []
 
