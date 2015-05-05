@@ -121,7 +121,7 @@ class BatchWrite(ModelContextManager):
         if data is None:
             return
         unprocessed_items = data.get(UNPROCESSED_ITEMS, {}).get(self.model.Meta.table_name)
-        timeout = 1
+        timeout = 0.5
         while unprocessed_items:
             timeout = timeout * 2
             log.warning("BATCH WRITE PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
@@ -294,7 +294,7 @@ class Model(with_metaclass(MetaModel)):
                     hash_keyname: hash_key
                 })
 
-        timeout = 1
+        timeout = 0.5
         while keys_to_get:
             page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read, attributes_to_get)
             for batch_item in page:
