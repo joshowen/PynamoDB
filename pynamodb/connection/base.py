@@ -215,7 +215,10 @@ class Connection(object):
                 if backoff:
                     timeout = kwargs.get("timeout", 0.5)
                     timeout = timeout * 2
-                    log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                    if timeout < 16:
+                        log.debug("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                    else:
+                        log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
 
                     # arbitrary timeout limit such that if backing off doesn't help, at some point
                     # let the exception propagate and it becomes a real error
