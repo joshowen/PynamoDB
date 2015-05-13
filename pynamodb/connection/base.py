@@ -225,7 +225,7 @@ class Connection(object):
                     if timeout <= 128:
                         time.sleep(timeout)
                         return self.dispatch(operation_name, operation_kwargs, backoff=backoff, timeout=timeout)
-            if "InternalServerError" in response.content:
+            if response.status_code in (500, 503):  # Retryable DynanmnoDB Service Errors (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ErrorHandling.html)
                 if backoff:
                     timeout = kwargs.get("timeout", 0.5)
                     timeout = timeout * 2
