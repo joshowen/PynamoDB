@@ -225,6 +225,17 @@ class Connection(object):
                     if timeout <= 128:
                         time.sleep(timeout)
                         return self.dispatch(operation_name, operation_kwargs, backoff=backoff, timeout=timeout)
+            if "InternalServerError" in response.content:
+                if backoff:
+                    timeout = kwargs.get("timeout", 0.5)
+                    timeout = timeout * 2
+                    log.warning("InternalServerError: exponentially backing off for %s seconds", timeout)
+
+                    # arbitrary timeout limit such that if backing off doesn't help, at some point
+                    # let the exception propagate and it becomes a real error
+                    if timeout <= 128:
+                        time.sleep(timeout)
+                        return self.dispatch(operation_name, operation_kwargs, backoff=backoff, timeout=timeout)
             self._log_error(operation_name, response)
 
         if data and CONSUMED_CAPACITY in data:
