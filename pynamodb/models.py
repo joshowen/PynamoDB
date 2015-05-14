@@ -68,6 +68,9 @@ class BatchWrite(ModelContextManager):
 
         :param put_item: Should be an instance of a `Model` to be written
         """
+        for k, v in put_item._get_attributes().iteritems():
+            if v.calculator is not None:
+                setattr(put_item, k, v.calculator(put_item))
         if len(self.pending_operations) == self.max_operations:
             if not self.auto_commit:
                 raise ValueError("DynamoDB allows a maximum of 25 batch operations")
@@ -393,6 +396,9 @@ class Model(with_metaclass(MetaModel)):
         """
         Save this object to dynamodb
         """
+        for k, v in self._get_attributes().iteritems():
+            if v.calculator is not None:
+                setattr(self, k, v.calculator(self))
         args, kwargs = self._get_save_args()
         if len(expected_values):
             kwargs.update(expected=self._build_expected_values(expected_values, PUT_FILTER_OPERATOR_MAP))
