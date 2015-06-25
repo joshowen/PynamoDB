@@ -128,7 +128,7 @@ class BatchWrite(ModelContextManager):
         while unprocessed_items:
             timeout = timeout * 2
             if timeout < 16:
-                log.debug("BATCH WRITE PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                log.info("BATCH WRITE PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
             else:
                 log.warning("BATCH WRITE PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
             if timeout <= 128:
@@ -309,7 +309,7 @@ class Model(with_metaclass(MetaModel)):
                 keys_to_get = unprocessed_keys
                 timeout = timeout * 2
                 if timeout < 16:
-                    log.debug("BATCH READ PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                    log.info("BATCH READ PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
                 else:
                     log.warning("BATCH READ PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
                 if timeout <= 128:
