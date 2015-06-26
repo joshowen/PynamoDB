@@ -11,7 +11,7 @@ import copy
 import logging
 import collections
 from six import with_metaclass
-from .exceptions import DoesNotExist, TableDoesNotExist
+from .exceptions import DoesNotExist, TableDoesNotExist, BatchWriteException, BatchGetException
 from .throttle import NoThrottle
 from .attributes import Attribute
 from .connection.base import MetaTable
@@ -68,6 +68,9 @@ class BatchWrite(ModelContextManager):
 
         :param put_item: Should be an instance of a `Model` to be written
         """
+        for k, v in put_item._get_attributes().iteritems():
+            if v.calculator is not None:
+                setattr(put_item, k, v.calculator(put_item))
         if len(self.pending_operations) == self.max_operations:
             if not self.auto_commit:
                 raise ValueError("DynamoDB allows a maximum of 25 batch operations")
@@ -121,7 +124,17 @@ class BatchWrite(ModelContextManager):
         if data is None:
             return
         unprocessed_items = data.get(UNPROCESSED_ITEMS, {}).get(self.model.Meta.table_name)
+        timeout = 0.5
         while unprocessed_items:
+            timeout = timeout * 2
+            if timeout < 16:
+                log.info("BATCH WRITE PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+            else:
+                log.warning("BATCH WRITE PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+            if timeout <= 128:
+                time.sleep(timeout)
+            else:
+                raise BatchWriteException("Hit max throttle")
             put_items = []
             delete_items = []
             for item in unprocessed_items:
@@ -287,12 +300,22 @@ class Model(with_metaclass(MetaModel)):
                     hash_keyname: hash_key
                 })
 
+        timeout = 0.5
         while keys_to_get:
             page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read, attributes_to_get)
             for batch_item in page:
                 yield cls.from_raw_data(batch_item)
             if unprocessed_keys:
                 keys_to_get = unprocessed_keys
+                timeout = timeout * 2
+                if timeout < 16:
+                    log.info("BATCH READ PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                else:
+                    log.warning("BATCH READ PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                if timeout <= 128:
+                    time.sleep(timeout)
+                else:
+                    raise BatchGetException("Hit max throttle")
             else:
                 keys_to_get = []
 
@@ -373,6 +396,9 @@ class Model(with_metaclass(MetaModel)):
         """
         Save this object to dynamodb
         """
+        for k, v in self._get_attributes().iteritems():
+            if v.calculator is not None:
+                setattr(self, k, v.calculator(self))
         args, kwargs = self._get_save_args()
         if len(expected_values):
             kwargs.update(expected=self._build_expected_values(expected_values, PUT_FILTER_OPERATOR_MAP))
@@ -855,6 +881,7 @@ class Model(with_metaclass(MetaModel)):
         query_conditions = {}
         non_key_operator_map = non_key_operator_map or {}
         key_attribute_classes = key_attribute_classes or {}
+        non_key_attribute_classes = non_key_attribute_classes or {}
         for attr_name, operator, value in cls._tokenize_filters(filters):
             attribute_class = key_attribute_classes.get(attr_name, None)
             if attribute_class is None:

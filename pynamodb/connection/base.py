@@ -213,9 +213,23 @@ class Connection(object):
         if not response.ok:
             if "ProvisionedThroughputExceededException" in response.content:
                 if backoff:
-                    timeout = kwargs.get("timeout", 1)
+                    timeout = kwargs.get("timeout", 0.5)
                     timeout = timeout * 2
-                    log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                    if timeout < 16:
+                        log.debug("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                    else:
+                        log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+
+                    # arbitrary timeout limit such that if backing off doesn't help, at some point
+                    # let the exception propagate and it becomes a real error
+                    if timeout <= 128:
+                        time.sleep(timeout)
+                        return self.dispatch(operation_name, operation_kwargs, backoff=backoff, timeout=timeout)
+            if response.status_code in (500, 503):  # Retryable DynanmnoDB Service Errors (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ErrorHandling.html)
+                if backoff:
+                    timeout = kwargs.get("timeout", 0.5)
+                    timeout = timeout * 2
+                    log.warning("InternalServerError: exponentially backing off for %s seconds", timeout)
 
                     # arbitrary timeout limit such that if backing off doesn't help, at some point
                     # let the exception propagate and it becomes a real error
