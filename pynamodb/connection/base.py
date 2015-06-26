@@ -215,10 +215,7 @@ class Connection(object):
                 if backoff:
                     timeout = kwargs.get("timeout", 0.5)
                     timeout = timeout * 2
-                    if timeout < 16:
-                        log.debug("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
-                    else:
-                        log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
+                    log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", timeout)
 
                     # arbitrary timeout limit such that if backing off doesn't help, at some point
                     # let the exception propagate and it becomes a real error
@@ -275,8 +272,7 @@ class Connection(object):
                 self._endpoint = self.service.get_endpoint(self.region, endpoint_url=self.host)
             else:
                 self._endpoint = self.service.get_endpoint(self.region)
-            self._endpoint.http_session.mount('https://', botocore.vendored.requests.adapters.HTTPAdapter(pool_maxsize=250))
-            self._endpoint.http_session.mount('http://', botocore.vendored.requests.adapters.HTTPAdapter(pool_maxsize=250))
+            self._endpoint.http_session.mount('https://', botocore.vendored.requests.adapters.HTTPAdapter(pool_connections=250, pool_maxsize=250))
         return self._endpoint
 
     def get_meta_table(self, table_name, refresh=False):
