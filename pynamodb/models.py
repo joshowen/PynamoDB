@@ -136,13 +136,9 @@ class BatchWrite(ModelContextManager):
             delete_items = []
             for item in unprocessed_items:
                 if PUT_REQUEST in item:
-                    i = item.get(PUT_REQUEST).get('Item')
-                    if i is not None:
-                        put_items.append(i)
+                    put_items.append(item.get(PUT_REQUEST).get('Item'))
                 elif DELETE_REQUEST in item:
-                    i = item.get(DELETE_REQUEST).get('Item')
-                    if i is not None:
-                        delete_items.append(i)
+                    delete_items.append(item.get(DELETE_REQUEST).get('Key'))
             self.model.get_throttle().throttle()
             log.debug("Resending %d unprocessed keys for batch operation", len(unprocessed_items))
             data = self.model._get_connection().batch_write_item(
