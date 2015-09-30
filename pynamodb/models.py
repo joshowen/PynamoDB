@@ -7,7 +7,7 @@ import copy
 import logging
 import collections
 from six import with_metaclass
-from pynamodb.exceptions import DoesNotExist, TableDoesNotExist, TableError
+from pynamodb.exceptions import DoesNotExist, TableDoesNotExist, TableError, MaxBackoffExceeded
 from pynamodb.throttle import NoThrottle
 from pynamodb.attributes import Attribute
 from pynamodb.connection.base import MetaTable
@@ -96,7 +96,7 @@ class BatchWrite(ModelContextManager):
         """
         return self.commit()
 
-    def commit(self):
+    def commit(self, **kwargs):
         """
         Writes all of the changes that are pending
         """
@@ -121,7 +121,15 @@ class BatchWrite(ModelContextManager):
         if data is None:
             return
         unprocessed_items = data.get(UNPROCESSED_ITEMS, {}).get(self.model.Meta.table_name)
+        backoff = self.model.Meta.backoff
         while unprocessed_items:
+            if backoff:
+                if backoff > self.model.Meta.max_backoff:
+                    raise MaxBackoffExceeded()
+                else:
+                    log.info("PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", backoff)
+                    time.sleep(backoff)
+                    backoff *= 2
             put_items = []
             delete_items = []
             for item in unprocessed_items:
@@ -292,7 +300,16 @@ class Model(with_metaclass(MetaModel)):
                     hash_keyname: hash_key
                 })
 
+        backoff = cls.Meta.backoff
         while keys_to_get:
+            if backoff:
+                if backoff > cls.Meta.max_backoff:
+                    raise MaxBackoffExceeded()
+                else:
+                    log.info("PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", backoff)
+                    time.sleep(backoff)
+                    backoff *= 2
+
             page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read=None, attributes_to_get=None)
             for batch_item in page:
                 yield cls.from_raw_data(batch_item)
@@ -570,14 +587,14 @@ class Model(with_metaclass(MetaModel)):
         data = cls._get_connection().query(hash_key, **query_kwargs)
         cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
 
-        last_evaluated_key = data.get(LAST_EVALUATED_KEY, None)
-
         for item in data.get(ITEMS):
             if limit is not None:
                 limit -= 1
                 if not limit:
                     return
             yield cls.from_raw_data(item)
+
+        last_evaluated_key = data.get(LAST_EVALUATED_KEY, None)
 
         while last_evaluated_key:
             log.debug("Fetching query page with exclusive start key: %s", last_evaluated_key)
@@ -586,7 +603,7 @@ class Model(with_metaclass(MetaModel)):
                 limit -= data.get("Count", 0)
                 if limit == 0:
                     return
-            query_kwargs['exclusive_start_key'] = last_evaluated_key
+            query_kwargs['exclusive_start_key'] = cls._format_keys_for_botocore(last_evaluated_key)
             query_kwargs['limit'] = limit
             log.debug("Fetching query page with exclusive start key: %s", last_evaluated_key)
             data = cls._get_connection().query(hash_key, **query_kwargs)
@@ -643,7 +660,7 @@ class Model(with_metaclass(MetaModel)):
         while last_evaluated_key:
             log.debug("Fetching scan page with exclusive start key: %s", last_evaluated_key)
             data = cls._get_connection().scan(
-                exclusive_start_key=last_evaluated_key,
+                exclusive_start_key=cls._format_keys_for_botocore(last_evaluated_key),
                 limit=limit,
                 scan_filter=key_filter,
                 segment=segment,
@@ -1216,3 +1233,13 @@ class Model(with_metaclass(MetaModel)):
         if range_key is not None:
             range_key = cls._range_key_attribute().serialize(range_key)
         return hash_key, range_key
+
+    @classmethod
+    def _format_keys_for_botocore(cls, attribute_dict):
+        formatted = {}
+        for name, attr in attribute_dict.items():
+            attr_instance = cls._get_attributes()[name]
+            attr_type = ATTR_TYPE_MAP[attr_instance.attr_type]
+            value = attr[attr_type]
+            formatted[name] = {attr_type: attr_instance.serialize(attr_instance.deserialize(value))}
+        return formatted

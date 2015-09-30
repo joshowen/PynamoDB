@@ -2,6 +2,8 @@
 Lowest level connection
 """
 import logging
+from botocore.retryhandler import EXCEPTION_MAP
+from retrying import retry
 
 import six
 from botocore.session import get_session
@@ -230,6 +232,7 @@ class Connection(object):
             log.debug("%s %s consumed %s units",  data.get(TABLE_NAME, ''), operation_name, capacity)
         return data
 
+    @retry(retry_on_exception=lambda e: isinstance(e, tuple(EXCEPTION_MAP['GENERAL_CONNECTION_ERROR'])))
     def _make_api_call(self, operation_name, operation_kwargs, **kwargs):
         """
         This private method is here for two reasons:
@@ -250,21 +253,21 @@ class Connection(object):
             raise ClientError(botocore_expected_format, operation_name)
         elif backoff and response.status_code in (500, 503):
             # Retryable DynanmnoDB Service Errors (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ErrorHandling.html)
-            backoff *= 2
             log.warning("InternalServerError: exponentially backing off for %s seconds", backoff)
             # arbitrary timeout limit such that if backing off doesn't help, at some point
             # let the exception propagate and it becomes a real error
             if backoff <= kwargs.get('max_backoff', self.max_backoff):
                 time.sleep(backoff)
+                backoff *= 2
                 return self._make_api_call(operation_name, operation_kwargs, backoff=backoff)
             else:
                 raise MaxBackoffExceeded()
         elif backoff and "ProvisionedThroughputExceededException" in response.content:
-            backoff *= 2
-            log.warning("THROTTLED: At capacity, exponentially backing off for %s seconds", backoff)
+            log.info("THROTTLED: At capacity, exponentially backing off for %s seconds", backoff)
             # let the exception propagate and it becomes a real error
             if backoff <= kwargs.get('max_backoff', self.max_backoff):
                 time.sleep(backoff)
+                backoff *= 2
                 return self._make_api_call(operation_name, operation_kwargs, backoff=backoff)
             else:
                 raise MaxBackoffExceeded()
