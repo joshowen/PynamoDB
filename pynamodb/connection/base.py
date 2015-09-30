@@ -1,6 +1,7 @@
 """
 Lowest level connection
 """
+from base64 import b64decode
 import logging
 from botocore.retryhandler import EXCEPTION_MAP
 from retrying import retry
@@ -31,8 +32,8 @@ from pynamodb.constants import (
     WRITE_CAPACITY_UNITS, GLOBAL_SECONDARY_INDEXES, PROJECTION, EXCLUSIVE_START_TABLE_NAME, TOTAL,
     DELETE_TABLE, UPDATE_TABLE, LIST_TABLES, GLOBAL_SECONDARY_INDEX_UPDATES,
     CONSUMED_CAPACITY, CAPACITY_UNITS, QUERY_FILTER, QUERY_FILTER_VALUES, CONDITIONAL_OPERATOR,
-    CONDITIONAL_OPERATORS, NULL, NOT_NULL, SHORT_ATTR_TYPES
-)
+    CONDITIONAL_OPERATORS, NULL, NOT_NULL, SHORT_ATTR_TYPES,
+    ITEMS, DEFAULT_ENCODING, BINARY_SHORT, BINARY_SET_SHORT, LAST_EVALUATED_KEY)
 
 try:
     import ujson as json
@@ -271,6 +272,22 @@ class Connection(object):
                 return self._make_api_call(operation_name, operation_kwargs, backoff=backoff)
             else:
                 raise MaxBackoffExceeded()
+        # Simulate botocore's binary attribute handling
+        for item in data.get(ITEMS, tuple()):
+            for attr in item:
+                if BINARY_SHORT in attr:
+                    attr[BINARY_SHORT] = b64decode(attr[BINARY_SHORT].encode(DEFAULT_ENCODING))
+                elif BINARY_SET_SHORT in attr:
+                    value = attr[BINARY_SET_SHORT]
+                    if value and len(value):
+                        attr[BINARY_SET_SHORT] = set(b64decode(v.encode(DEFAULT_ENCODING)) for v in value)
+        for attr in data.get(LAST_EVALUATED_KEY, {}).values():
+            if BINARY_SHORT in attr:
+                attr[BINARY_SHORT] = b64decode(attr[BINARY_SHORT].encode(DEFAULT_ENCODING))
+            elif BINARY_SET_SHORT in attr:
+                value = attr[BINARY_SET_SHORT]
+                if value and len(value):
+                    attr[BINARY_SET_SHORT] = set(b64decode(v.encode(DEFAULT_ENCODING)) for v in value)
         return data
 
     @property
