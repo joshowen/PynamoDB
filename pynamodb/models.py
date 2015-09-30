@@ -571,17 +571,10 @@ class Model(with_metaclass(MetaModel)):
             filters=filters)
         log.debug("Fetching first query page")
 
-        query_kwargs = dict(
-            index_name=index_name,
-            exclusive_start_key=last_evaluated_key,
-            consistent_read=consistent_read,
-            scan_index_forward=scan_index_forward,
-            limit=limit,
-            key_conditions=key_conditions,
-            attributes_to_get=attributes_to_get,
-            query_filters=query_filters,
-            conditional_operator=conditional_operator
-        )
+        query_kwargs = {'index_name': index_name, 'exclusive_start_key': last_evaluated_key,
+                        'consistent_read': consistent_read, 'scan_index_forward': scan_index_forward, 'limit': limit,
+                        'key_conditions': key_conditions, 'attributes_to_get': attributes_to_get,
+                        'query_filters': query_filters, 'conditional_operator': conditional_operator}
 
         data = cls._get_connection().query(hash_key, **query_kwargs)
         cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
@@ -837,13 +830,8 @@ class Model(with_metaclass(MetaModel)):
                             value = [value]
                         condition = {
                             COMPARISON_OPERATOR: operator_map.get(token),
-                            ATTR_VALUE_LIST: [
-                                dict([
-                                    (
-                                        ATTR_TYPE_MAP[attribute_class.attr_type],
-                                        attribute_class.serialize(val)) for val in value
-                                ])
-                            ]
+                            ATTR_VALUE_LIST: [{ATTR_TYPE_MAP[attribute_class.attr_type]:
+                                                   attribute_class.serialize(val) for val in value}]
                         }
                     expected_values_result[attributes.get(attribute).attr_name] = condition
                 else:
