@@ -187,6 +187,8 @@ class MetaModel(type):
                         setattr(attr_obj, BACKOFF, None)
                     if not hasattr(attr_obj, MAX_BACKOFF):
                         setattr(attr_obj, MAX_BACKOFF, None)
+                    if not hasattr(attr_obj, 'session_cls'):
+                        setattr(attr_obj, 'session_cls', None)
                 elif issubclass(attr_obj.__class__, (Index, )):
                     attr_obj.Meta.model = cls
                     if not hasattr(attr_obj.Meta, "index_name"):
