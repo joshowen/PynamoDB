@@ -131,7 +131,8 @@ class BatchWrite(ModelContextManager):
                 if backoff > self.model.Meta.max_backoff:
                     raise MaxBackoffExceeded()
                 else:
-                    log.info("PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", backoff)
+                    log.info("PARTIALLY THROTTLED: %s at capacity, exponentially backing off for %s seconds",
+                             self.model.Meta.table_name, backoff)
                     time.sleep(backoff)
                     backoff *= 2
             put_items = []
@@ -313,7 +314,8 @@ class Model(with_metaclass(MetaModel)):
                 if backoff > cls.Meta.max_backoff:
                     raise MaxBackoffExceeded()
                 else:
-                    log.info("PARTIALLY THROTTLED: At capacity, exponentially backing off for %s seconds", backoff)
+                    log.info("PARTIALLY THROTTLED: %s at capacity, exponentially backing off for %s seconds",
+                             cls.Meta.table_name, backoff)
                     time.sleep(backoff)
                     backoff *= 2
             page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read=None, attributes_to_get=None)
