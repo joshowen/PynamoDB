@@ -601,9 +601,9 @@ class Model(with_metaclass(MetaModel)):
             log.debug("Fetching query page with exclusive start key: %s", last_evaluated_key)
             # If the user provided a limit, we need to subtract the number of results returned for each page
             if limit is not None:
-                limit -= data.get("Count", 0)
                 if limit == 0:
                     return
+                limit -= data.get("Count", 0)
             query_kwargs['exclusive_start_key'] = last_evaluated_key
             query_kwargs['limit'] = limit
             log.debug("Fetching query page with exclusive start key: %s", last_evaluated_key)
