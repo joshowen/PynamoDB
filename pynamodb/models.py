@@ -611,9 +611,9 @@ class Model(with_metaclass(MetaModel)):
             cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
             for item in data.get(ITEMS):
                 if limit is not None:
-                    limit -= 1
-                    if not limit:
+                    if limit == 0:
                         return
+                    limit -= 1
                 yield cls.from_raw_data(item)
             last_evaluated_key = data.get(LAST_EVALUATED_KEY, None)
 
@@ -653,11 +653,11 @@ class Model(with_metaclass(MetaModel)):
         last_evaluated_key = data.get(LAST_EVALUATED_KEY, None)
         cls._throttle.add_record(data.get(CONSUMED_CAPACITY))
         for item in data.get(ITEMS):
-            yield cls.from_raw_data(item)
             if limit is not None:
-                limit -= 1
-                if not limit:
+                if limit == 0:
                     return
+                limit -= 1
+            yield cls.from_raw_data(item)
         while last_evaluated_key:
             log.debug("Fetching scan page with exclusive start key: %s", last_evaluated_key)
             data = cls._get_connection().scan(
@@ -668,11 +668,11 @@ class Model(with_metaclass(MetaModel)):
                 total_segments=total_segments
             )
             for item in data.get(ITEMS):
-                yield cls.from_raw_data(item)
                 if limit is not None:
-                    limit -= 1
-                    if not limit:
+                    if limit == 0:
                         return
+                    limit -= 1
+                yield cls.from_raw_data(item)
 
             last_evaluated_key = data.get(LAST_EVALUATED_KEY, None)
 
