@@ -251,7 +251,7 @@ class Connection(object):
             operation_model
         )
         prepared_request = self.client._endpoint.create_request(request_dict, operation_model)
-        response = self.requests_session.send(prepared_request)
+        response = self.requests_session.send(prepared_request, proxies=self.client._endpoint.proxies)
         backoff = kwargs.get('backoff', self.backoff)
         data = json.loads(response.text)
         if backoff and response.status_code in (500, 503):
