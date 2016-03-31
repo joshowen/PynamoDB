@@ -178,7 +178,7 @@ class MetaModel(type):
     """
     def __init__(cls, name, bases, attrs):
         if isinstance(attrs, dict):
-            for attr_name, attr_obj in attrs.items():
+            for attr_name, attr_obj in six.iteritems(attrs):
                 if attr_name == META_CLASS_NAME:
                     if not hasattr(attr_obj, REGION):
                         setattr(attr_obj, REGION, DEFAULT_REGION)
@@ -286,8 +286,8 @@ class Model(with_metaclass(MetaModel)):
         while items:
             if len(keys_to_get) == BATCH_GET_PAGE_LIMIT:
                 while keys_to_get:
-                    page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read=None,
-                                                                 attributes_to_get=None)
+                    page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read=consistent_read,
+                                                                 attributes_to_get=attributes_to_get)
                     for batch_item in page:
                         yield cls.from_raw_data(batch_item)
                     if unprocessed_keys:
@@ -318,7 +318,8 @@ class Model(with_metaclass(MetaModel)):
                              cls.Meta.table_name, backoff)
                     time.sleep(backoff)
                     backoff *= 2
-            page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read=None, attributes_to_get=None)
+            page, unprocessed_keys = cls._batch_get_page(keys_to_get, consistent_read=consistent_read,
+                                                         attributes_to_get=attributes_to_get)
             for batch_item in page:
                 yield cls.from_raw_data(batch_item)
             if unprocessed_keys:
@@ -368,7 +369,7 @@ class Model(with_metaclass(MetaModel)):
         """
         args, save_kwargs = self._get_save_args(null_check=False)
         attribute_cls = None
-        for attr_name, attr_cls in self._get_attributes().items():
+        for attr_name, attr_cls in six.iteritems(self._get_attributes()):
             if attr_name == attribute:
                 value = attr_cls.serialize(value)
                 attribute_cls = attr_cls
@@ -393,7 +394,7 @@ class Model(with_metaclass(MetaModel)):
             **kwargs
         )
         self._throttle.add_record(data.get(CONSUMED_CAPACITY))
-        for name, value in data.get(ATTRIBUTES).items():
+        for name, value in six.iteritems(data.get(ATTRIBUTES)):
             attr = self._get_attributes().get(name, None)
             if attr:
                 setattr(self, name, attr.deserialize(value.get(ATTR_TYPE_MAP[attr.attr_type])))
@@ -478,7 +479,7 @@ class Model(with_metaclass(MetaModel)):
             range_key_type = cls._get_meta_data().get_attribute_type(range_keyname)
             range_key = mutable_data.pop(range_keyname).get(range_key_type)
             kwargs['range_key'] = range_key_attr.deserialize(range_key)
-        for name, value in mutable_data.items():
+        for name, value in six.iteritems(mutable_data):
             attr = cls._get_attributes().get(name, None)
             if attr:
                 kwargs[name] = attr.deserialize(value.get(ATTR_TYPE_MAP[attr.attr_type]))
@@ -511,7 +512,7 @@ class Model(with_metaclass(MetaModel)):
             hash_key = cls._serialize_keys(hash_key)[0]
             non_key_attribute_classes = AttributeDict()
             key_attribute_classes = AttributeDict()
-            for name, attr in cls._get_attributes().items():
+            for name, attr in six.iteritems(cls._get_attributes()):
                 if attr.is_range_key or attr.is_hash_key:
                     key_attribute_classes[name] = attr
                 else:
@@ -567,7 +568,7 @@ class Model(with_metaclass(MetaModel)):
             hash_key = cls._serialize_keys(hash_key)[0]
             non_key_attribute_classes = AttributeDict()
             key_attribute_classes = AttributeDict()
-            for name, attr in cls._get_attributes().items():
+            for name, attr in six.iteritems(cls._get_attributes()):
                 if attr.is_range_key or attr.is_hash_key:
                     key_attribute_classes[name] = attr
                 else:
@@ -807,7 +808,7 @@ class Model(with_metaclass(MetaModel)):
         expected_values_result = {}
         attributes = cls._get_attributes()
         filters = {}
-        for attr_name, attr_value in expected_values.items():
+        for attr_name, attr_value in six.iteritems(expected_values):
             attr_cond = VALUE
             if attr_name.endswith("__exists"):
                 attr_cond = EXISTS
@@ -821,7 +822,7 @@ class Model(with_metaclass(MetaModel)):
                 expected_values_result[attr_cls.attr_name] = {
                     attr_cond: attr_value
                 }
-        for cond, value in filters.items():
+        for cond, value in six.iteritems(filters):
             attribute = None
             attribute_class = None
             for token in cond.split('__'):
@@ -871,7 +872,7 @@ class Model(with_metaclass(MetaModel)):
         Tokenizes filters in the attribute name, operator, and value
         """
         filters = filters or {}
-        for query, value in filters.items():
+        for query, value in six.iteritems(filters):
             if '__' in query:
                 attribute, operator = query.split('__')
                 yield attribute, operator, value
@@ -945,7 +946,7 @@ class Model(with_metaclass(MetaModel)):
             pythonic(ATTR_DEFINITIONS): [],
             pythonic(KEY_SCHEMA): []
         }
-        for attr_name, attr_cls in cls._get_attributes().items():
+        for attr_name, attr_cls in six.iteritems(cls._get_attributes()):
             if attr_cls.is_hash_key or attr_cls.is_range_key:
                 schema[pythonic(ATTR_DEFINITIONS)].append({
                     pythonic(ATTR_NAME): attr_cls.attr_name,
@@ -1194,7 +1195,7 @@ class Model(with_metaclass(MetaModel)):
 
         :param attrs: A dictionary of attributes to update this item with.
         """
-        for name, attr in attrs.items():
+        for name, attr in six.iteritems(attrs):
             attr_instance = self._get_attributes().get(name, None)
             if attr_instance:
                 attr_type = ATTR_TYPE_MAP[attr_instance.attr_type]
